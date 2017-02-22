@@ -18,62 +18,19 @@
 
 #include <centroid_k2_srv/centroid.h>
 
-/**
+int counter = 0;
 cv_bridge::CvImage img_bridge;
-
-bool cld_cap = false;
-bool img_cap = false;
-
-void cloud_callback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
-
-    if (!cld_cap) {
-
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr pt_cld(new pcl::PointCloud<pcl::PointXYZRGB>);
-
-        std::cout<< "Cloud: width = "<< msg->width << " height = " << msg->height << std::endl;
-
-        pcl::fromROSMsg(*msg, *pt_cld);
-
-        pcl::io::savePCDFileASCII ("test_pcd.pcd", *pt_cld);
-
-        cld_cap = true;
-    }
-
-}
-
-void image_callback(const sensor_msgs::Image::ConstPtr& msg) {
-
-    if (!img_cap) {
-        std::cout<< "Image: width = "<< msg->width << " height = " << msg->height << std::endl;
-
-        try {
-            cv::Mat img = cv_bridge::toCvShare(msg, "bgr8")->image;
-            cv::imwrite("test_img.jpg", img);
-        } catch (cv_bridge::Exception& e) {
-            ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
-        }
-        img_cap = true;
-    }
-
-}**/
-
 
 int main(int argc, char **argv) {
 
     ros::init(argc, argv, "test_client");
+    ros::NodeHandle nh;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr pt_cld(new pcl::PointCloud<pcl::PointXYZRGB>);
 
     pcl::io::loadPCDFile("/home/isl-server/Workspace/ros/src/centroid_k2_srv/data/test_pcd.pcd", *pt_cld);
+    cv::Mat img = cv::imread("/home/isl-server/Workspace/ros/src/centroid_k2_srv/data/test_image.jpg");
 
-    //cv::Mat = cv::imread("/home/isl-server/Workspace/ros/src/centroid_k2_srv/data/test_image.jpg");
-
-    /**pcl::visualization::CloudViewer viewer ("Simple Cloud Viewer");
-    viewer.showCloud (pt_cld);
-    while (!viewer.wasStopped ())
-    {
-    }**/
-
-    ROS_DEBUG("Loaded PointCloud");
+    ROS_DEBUG("Loaded Data");
 
     /**
      * @brief msg_cld rosmessage format container
@@ -82,24 +39,21 @@ int main(int argc, char **argv) {
 
     ROS_DEBUG("Before conversion...");
     pcl::toROSMsg(*pt_cld, *msg_cld);
-    ROS_DEBUG("Converted PointCloud");
 
-    /**
-     * @brief arr bbox for the cloud bear
-     */
-    std_msgs::UInt16MultiArray arr;
+    sensor_msgs::Image img_msg;
+    std_msgs::Header header;
+    header.seq = counter++;
+    header.stamp = ros::Time::now();
 
-    arr.data.push_back(351);
-    arr.data.push_back(120);
-    arr.data.push_back(457);
-    arr.data.push_back(241);
+    img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::BGR8, img);
+    img_bridge.toImageMsg(img_msg);
+    ROS_DEBUG("Converted Data");
 
-    ros::NodeHandle nh;
     ros::ServiceClient client = nh.serviceClient<centroid_k2_srv::centroid>("get_centroid");
 
     centroid_k2_srv::centroid srv;
     srv.request.pc2 = *msg_cld;
-    srv.request.boxes = arr;
+    srv.request.img = img_msg;
 
     ROS_DEBUG("Before calling client service");
 
@@ -112,17 +66,12 @@ int main(int argc, char **argv) {
 
     std_msgs::Float32MultiArray oarr = srv.response.centroid;
 
-    ROS_DEBUG("Output : c_x : %f, c_y : %f, c_z : %f, n_x : %f, n_y : %f, n_z : %f",
-              oarr.data[0], oarr.data[1], oarr.data[2], oarr.data[3], oarr.data[4], oarr.data[5]);
-
-    /**
-    image_transport::ImageTransport it(nh);
-
-    ros::Subscriber cld_sub, img_sub;
-
-    cld_sub = nh.subscribe<sensor_msgs::PointCloud2>("/kinect2/qhd/points", 1, cloud_callback);
-    img_sub = nh.subscribe<sensor_msgs::Image>("/kinect2/qhd/image_color", 1, image_callback);
-    */
+    ROS_DEBUG("Centroid : c_x : %f, c_y : %f, c_z : %f",
+              oarr.data[0], oarr.data[1], oarr.data[2]);
+    ROS_DEBUG("Normal : n_x : %f, n_y : %f, n_z : %f",
+              oarr.data[3], oarr.data[4], oarr.data[5]);
+    ROS_DEBUG("Axis : a_x : %f, a_y : %f, a_z : %f",
+              oarr.data[6], oarr.data[7], oarr.data[8]);
 
     ros::spinOnce();
 

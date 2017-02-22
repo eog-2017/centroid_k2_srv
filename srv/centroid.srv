@@ -1,4 +1,4 @@
 sensor_msgs/PointCloud2 pc2
-std_msgs/UInt16MultiArray boxes
+sensor_msgs/Image img
 ---
 std_msgs/Float32MultiArray centroid

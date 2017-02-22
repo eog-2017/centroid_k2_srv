@@ -1,4 +1,0 @@
-sensor_msgs/PointCloud2 pc2
-std_msgs/Int16MultiArray boxes
----
-std_msgs/Float32MultiArray centroid
